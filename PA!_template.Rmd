@@ -1,0 +1,98 @@
+---
+title: "PA1_template"
+output: html_document
+---
+# Download data set, load it into memory, 
+# and process into the "activity" data frame.
+# Install and load required packages
+
+```{r, echo = TRUE, message = FALSE}
+if (!file.exists("~/data")) {
+      dir.create("~/data")
+}
+
+setwd("~/data")
+
+fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+
+download.file(fileUrl, destfile = "~/data/activity.zip", method ="curl")
+
+unzip("activity.zip")
+activity <-read.csv("activity.csv")
+
+
+library(plyr)
+library(lattice)
+```
+
+# Calculate total number of steps taken each day.
+# Calculate mean and median of the total number of steps each day.
+# Plot Histogram of the total number of steps taken each day.
+
+```{r, echo = TRUE, message = FALSE}
+
+stepTotals <- ddply(activity, .(date), summarize, Total = sum(steps, na.rm = TRUE))
+    mean(stepTotals$Total)
+    median(stepTotals$Total)
+
+hist(stepTotals$Total)
+```
+
+Make a time series plot of the 5 minute interval and the number of steps taken averaged across all days.
+Calculate, on average, which 5 minute interval across all days contains the maximum number of steps.
+
+```{r, echo=TRUE, message=FALSE}
+
+intervalMean <- ddply(activity, .(interval), summarize, intMean = mean(steps, na.rm = TRUE))
+
+plot.ts(intervalMean, type="l")
+
+which.max(intervalMean$intMean)
+
+```
+*Impute missing values
+
+Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+
+Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+
+Create a new dataset that is equal to the original dataset but with the missing data filled in.
+
+Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+```{r, echo=TRUE, message=FALSE}
+sum(is.na(activity))
+
+newact<- merge(activity, intervalMean, all=T)
+
+activityImputed<-transform(newact,  steps = ifelse(is.na(steps), ave(steps, interval, FUN = function(x) mean(x, na.rm = TRUE)), steps))
+
+stepTotalsImputed <- ddply(activityImputed, .(date), summarize, Total = sum(steps, na.rm = TRUE))
+    mean(stepTotalsImputed$Total)
+    median(stepTotalsImputed$Total)
+
+hist(stepTotalsImputed$Total)
+
+
+```
+
+Are there differences in activity patterns between weekdays and weekends?
+
+For this part the weekdays() function may be of some help here. Use the dataset with the filled-in missing values for this part.
+
+Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+
+Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). See the README file in the GitHub repository to see an example of what this plot should look like using simulated data.
+
+```{r}
+
+activityImputed$date <- as.POSIXct(activityImputed$date)
+activityImputed$weekday <- weekdays(activityImputed$date)
+activityImputed <- mutate(activityImputed, day.type = ifelse(weekday == "Saturday"|weekday =="Sunday", "weekend", "weekday"))
+
+weekdayIntervalMean <- ddply(activityImputed, .(interval), summarize, weekdayIntMean = mean(steps, day.type="weekday", na.rm = TRUE))
+
+weekendIntervalMean <- ddply(activityImputed, .(interval), summarize, weekendIntMean = mean(steps, day.type="weekend", na.rm = TRUE))
+
+daySplit<- data.frame(activityImputed$interval, weekdayIntervalMean, weekendIntervalMean)
+
